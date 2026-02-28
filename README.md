@@ -1,6 +1,5 @@
-#s21Decimal
+##s21Decimal
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 Библиотека для работы с типом *decimal* который отсутствует в стандартной реализации. Разработана в рамках учебного курса. Поддерживает базовые арифметические операции, сравнение и округление."
 
