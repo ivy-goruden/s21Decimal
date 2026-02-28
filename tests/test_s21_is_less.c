@@ -4,64 +4,65 @@
 #include <string.h>
 
 #include "main_test.h"
-START_TEST(test_is_equal_0) {
+START_TEST(test_is_less_0) {
   s21_decimal v1;
   create_decimal(&v1, 0, 1, 0, 0, 0);
   s21_decimal v2;
   create_decimal(&v2, 0, 1, 0, 0, 1);
-  int result = s21_is_equal(v1, v2);
-  ck_assert_int_eq(result, 0);
-}
-END_TEST
-
-START_TEST(test_is_equal_1) {
-  s21_decimal v1;
-  create_decimal(&v1, 0, 1, 1, 0, 0);
-  s21_decimal v2;
-  create_decimal(&v2, 0, 1, 0, 2, 0);
-  int result = s21_is_equal(v1, v2);
-  ck_assert_int_eq(result, 0);
-}
-END_TEST
-
-START_TEST(test_is_equal_2) {
-  s21_decimal v1;
-  create_decimal(&v1, 0, 1, 1, 0, 0);
-  s21_decimal v2;
-  create_decimal(&v2, 0, 1, 1, 0, 0);
-  int result = s21_is_equal(v1, v2);
+  int result = s21_is_less(v1, v2);
   ck_assert_int_eq(result, 1);
 }
 END_TEST
 
-START_TEST(test_is_equal_3) {
+START_TEST(test_is_less_1) {
   s21_decimal v1;
-  create_decimal(&v1, 1, 1, 1, 0, 0);
+  create_decimal(&v1, 0, 1, 1, 0, 0);
+  s21_decimal v2;
+  create_decimal(&v2, 0, 1, 0, 2, 0);
+  int result = s21_is_less(v1, v2);
+  ck_assert_int_eq(result, 1);
+}
+END_TEST
+
+START_TEST(test_is_less_2) {
+  s21_decimal v1;
+  create_decimal(&v1, 0, 1, 1, 0, 0);
   s21_decimal v2;
   create_decimal(&v2, 0, 1, 1, 0, 0);
-  int result = s21_is_equal(v1, v2);
+  int result = s21_is_less(v1, v2);
   ck_assert_int_eq(result, 0);
 }
 END_TEST
 
-Suite *add_suite(void) {
-  Suite *s = suite_create("is_equal_tests");
+START_TEST(test_is_less_3) {
+  s21_decimal v1;
+  create_decimal(&v1, 1, 1, 1, 0, 0);
+  s21_decimal v2;
+  create_decimal(&v2, 0, 1, 1, 0, 0);
+  int result = s21_is_less(v1, v2);
+  ck_assert_int_eq(result, 1);
+}
+END_TEST
+
+Suite *il_suite(void) {
+  Suite *s = suite_create("is_less_tests");
 
   TCase *tc_core = tcase_create("Core");
-  tcase_add_test(tc_core, test_is_equal_0);
-  tcase_add_test(tc_core, test_is_equal_1);
-  tcase_add_test(tc_core, test_is_equal_2);
-  tcase_add_test(tc_core, test_is_equal_3);
+  tcase_add_test(tc_core, test_is_less_0);
+  tcase_add_test(tc_core, test_is_less_1);
+  tcase_add_test(tc_core, test_is_less_2);
+  tcase_add_test(tc_core, test_is_less_3);
 
   suite_add_tcase(s, tc_core);
   return s;
 }
 
 // Запуск тестов
-int main_s21_equal(Suite *s) {
+int main_s21_less() {
+  Suite *s;
   int number_failed;
   SRunner *sr;
-
+  s = il_suite();
   sr = srunner_create(s);
 
   srunner_run_all(sr, CK_VERBOSE);

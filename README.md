@@ -1,0 +1,39 @@
+#s21Decimal
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+Библиотека для работы с типом *decimal* который отсутствует в стандартной реализации. Разработана в рамках учебного курса. Поддерживает базовые арифметические операции, сравнение и округление."
+
+## Содержание
+
+- [Функционал](#функционал)
+- [Установка и запуск](#установка-и-запуск)
+- [Использование / Примеры](#использование--примеры)
+- [Тестирование](#тестирование)
+- [Автор](#автор)
+
+
+## Функционал
+
+- Арифметические операторы (s21_add, s21_sub, s21_mul, s21_div).
+- Операторы сравнения (s21_is_less, s21_is_less_or_equal, s21_is_greater, s21_is_greater_or_equal, s21_is_equal, s21_is_not_equal).
+- Преобразователи (s21_from_int_to_decimal, s21_from_float_to_decimal, s21_from_decimal_to_int, s21_from_decimal_to_float).
+- Другие функции (s21_floor, s21_round, s21_truncate, s21_negate).
+
+
+## Установка и запуск
+Пошаговая инструкция, как развернуть проект у себя.
+
+```bash
+# 1. Клонируйте репозиторий
+git clone https://github.com/ivy-goruden/s21Decimal.git
+
+# 2. Перейдите в папку проекта
+cd s21Decimal
+
+# 3. Соберите проект с помощью Makefile
+make
+
+# 4. Запуск тестов
+make test
+```

@@ -1,5 +1,6 @@
 #include "s21_decimal.h"
 
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -50,7 +51,8 @@ int get_scale(s21_decimal num) { return (num.bits[3] >> 16) & (int)0xff; }
 
 // поставить порядок decimal
 void set_scale(s21_decimal *num, unsigned char scale_value) {
-  if (scale_value > 28) scale_value = 28;
+  if (scale_value > 28)
+    scale_value = 28;
   unsigned *pint = (unsigned *)num->bits + 3;
   unsigned char *pbyte = (unsigned char *)pint + 2;
   *pbyte = scale_value;
@@ -58,13 +60,15 @@ void set_scale(s21_decimal *num, unsigned char scale_value) {
 
 // вернуть значение бита decimal с номером от 0 до 127
 int get_bit(s21_decimal num, int bit) {
-  if (bit >= 96) bit += 128;
+  if (bit >= 96)
+    bit += 128;
   return big_get_bit(tobig_decimal(num), bit);
 }
 
 // установить значение бита decimal с номером от 0 до 127
 void set_bit(s21_decimal *num, unsigned bit, unsigned char value) {
-  if (bit > 127) bit = 127;
+  if (bit > 127)
+    bit = 127;
   big_set_bit((s21_big_decimal *)num, bit, value);
 }
 
@@ -96,7 +100,8 @@ int big_get_scale(s21_big_decimal num) {
 }
 
 void big_set_scale(s21_big_decimal *num, unsigned char scale_value) {
-  if (scale_value > 57) scale_value = 57;
+  if (scale_value > 57)
+    scale_value = 57;
   unsigned *pint = (unsigned *)num->bits + 7;
   unsigned char *pbyte = (unsigned char *)pint + 2;
   *pbyte = scale_value;
@@ -139,25 +144,12 @@ void shift_left(s21_big_decimal *num) {
 // сдвигаются только значащие биты, int в котором лежить порядок и знак не
 // сдвигаются
 void shift_left_num(s21_big_decimal *num, int shift_value) {
-  if (shift_value < 0) shift_value = 0;
-  if (shift_value > 224) shift_value = 224;
+  if (shift_value < 0)
+    shift_value = 0;
+  if (shift_value > 224)
+    shift_value = 224;
   for (int i = 0; i < shift_value; i++) {
     shift_left(num);
-  }
-}
-
-void shift_right(s21_big_decimal *num) {
-  for (int i = 0; i < 7; i++) {
-    num->bits[i] >>= 1;
-    if (i < 6) {
-      num->bits[i] |= ((num->bits[i + 1] & 1) << 31);
-    }
-  }
-}
-
-void shift_right_num(s21_big_decimal *num, int shift_value) {
-  for (int i = 0; i < shift_value; i++) {
-    shift_right(num);
   }
 }
 
@@ -168,14 +160,53 @@ void mul_10(s21_big_decimal *num) {
   shift_left_num(&num1, 3);
   shift_left_num(&num2, 1);
   bitwise_addition(num1, num2, num);
+  big_set_sign(num, big_get_sign(*num));
+  big_set_scale(num, big_get_scale(*num));
 }
 
-void div_10(s21_big_decimal *num) {
-  s21_big_decimal num1 = *num;
-  s21_big_decimal num2 = *num;
-  shift_right_num(&num1, 3);
-  shift_right_num(&num2, 1);
-  bitwise_addition(num1, num2, num);
+// разделить num на 10. результат положить num. остаток от деления не
+// учитывается
+void div_10(s21_big_decimal *num, int pow) {
+  // результат
+  s21_big_decimal res;
+  big_null_decimal(&res);
+
+  // 1. Create 10^scale
+  s21_big_decimal pow10 = {{1, 0, 0, 0, 0, 0, 0, 0}};
+  for (int i = 0; i < pow; i++) {
+    mul_10(&pow10);
+  }
+
+  int nnb1 = not_null(*num);
+  int nnb2 = not_null(pow10);
+  // деление столбиком
+  s21_big_decimal reminder = *num;
+  for (int i = nnb1 - nnb2; i >= 0; i--) {
+    s21_big_decimal delitel = pow10;
+    shift_left_num(&delitel, i);
+    if (cmp_mantis(reminder, delitel) >= 0) {
+      shift_left(&res);
+      big_set_bit(&res, 0, 1);
+      bitwise_substruction(reminder, delitel, &reminder);
+    } else {
+      shift_left(&res);
+    }
+  }
+  big_set_sign(&res, big_get_sign(*num));
+  big_set_scale(&res, big_get_scale(*num));
+  *num = res;
+}
+
+// битовое деление s21_big_decimal на 10.
+// частное от деления будет в result
+// в результате остаток от деления
+int rem_10(s21_big_decimal num, s21_big_decimal *result) {
+  s21_big_decimal tmp1 = num;
+  div_10(&tmp1, 1);
+  *result = tmp1;
+  mul_10(&tmp1);
+  bitwise_substruction(num, tmp1, &num);
+  return num.bits[0];
 }
 
 // поставить big_decimal новый порядок, который задается параметром scale
@@ -209,6 +240,24 @@ int cmp_mantis(s21_big_decimal v1, s21_big_decimal v2) {
   }
   return result;
 }
+
+// int cmp_mantis_small(s21_decimal v1, s21_decimal v2) {
+//     int sizeb = (sizeof(s21_decimal) - sizeof(unsigned)) * 8;
+//     int result = 0;
+//     for (int i = sizeb - 1; i >= 0; i--) {
+//         int b1 = get_bit(v1, i);
+//         int b2 = get_bit(v2, i);
+//         if (b1 != b2) {
+//             if (b1 > b2) {
+//                 result = 1;
+//             } else if (b1 < b2) {
+//                 result = -1;
+//             }
+//             break;
+//         }
+//     }
+//     return result;
+// }
 
 // поиск ненулевого бита мантисы s21_big_decimal
 int not_null(s21_big_decimal v) {
@@ -250,7 +299,7 @@ void bitwise_substruction(s21_big_decimal v1, s21_big_decimal v2,
   int size = (sizeof(s21_big_decimal) - sizeof(unsigned));
 
   // дополнение вычитаемого v2 до 1 -> v2
-  for (int i = 0; i < (size / sizeof(unsigned)); i++) {
+  for (int i = 0; i < (int)(size / sizeof(unsigned)); i++) {
     v2.bits[i] = ~v2.bits[i];
   }
 
@@ -271,13 +320,19 @@ void bitwise_substruction(s21_big_decimal v1, s21_big_decimal v2,
 
 /*
     Сравниваете длины чисел (если они разной длины, то число с большей длиной —
-   больше). Если длины равны, идёте по битам слева направо. На первом
-   отличающемся бите тот, у кого бит равен 1 — большее число. Если все биты
-   одинаковые — числа равны.
+    больше). Если длины равны, идёте по битам слева направо. На первом
+    отличающемся бите тот, у кого бит равен 1 — большее число. Если все биты
+    одинаковые — числа равны.
 */
 int compare(s21_decimal a, s21_decimal b) {
+  if (is_zero(a) && is_zero(b))
+    return 0;
+  s21_big_decimal a1;
+  s21_big_decimal b1;
+
   // Приводим к одному масштабу (чтобы сравнивать мантиссы)
-  normalize_decimals(&a, &b);
+  normalize_decimalsCompare(&a, &b, &a1, &b1);
+
   // Получаем знаки
   int sign_a = get_sign(a);
   int sign_b = get_sign(b);
@@ -285,22 +340,23 @@ int compare(s21_decimal a, s21_decimal b) {
   // Случай 1: разные знаки
   if (sign_a != sign_b) {
     return sign_a ? 2
-                  : 1;  // Если a отрицательное -> b больше (2), иначе наоборот
+                  : 1; // Если a отрицательное -> b больше (2), иначе наоборот
   }
 
   // Сравниваем мантиссы
-  int cmp = cmp_mantis_small(a, b);
+  int cmp = cmp_mantis(a1, b1);
 
   // Оба положительные
-  if (!sign_a) {
-    if (cmp == 0) return 0;   // a == b
-    return cmp == 1 ? 1 : 2;  // a > b → 1, иначе 2
+  if (sign_a == 0) {
+    if (cmp == 0)
+      return 0;              // a == b
+    return cmp == 1 ? 1 : 2; // a > b → 1, иначе 2
   }
   // Оба отрицательные (обратная логика)
   else {
-    if (cmp == 0) return 0;  // a == b
-    return cmp == 1 ? 2
-                    : 1;  // Если |a| > |b| → фактически a < b → возвращаем 2
+    if (cmp == 0)
+      return 0;              // a == b
+    return cmp == 1 ? 2 : 1; // Если |a| > |b| → фактически a < b → возвращаем 2
   }
 }
 
@@ -322,29 +378,14 @@ int s21_is_greater_or_equal(s21_decimal a, s21_decimal b) {
 // числа равны если все bits чисел тоже равны
 // вернет 1 - если v1 == v2, иначе 0
 int s21_is_equal(s21_decimal v1, s21_decimal v2) {
-  int result = 1;
-  for (int i = 0; i < 4; i++) {
-    if (v1.bits[i] != v2.bits[i]) {
-      result = 0;
-      break;
-    }
-  }
-  return result;
+  return compare(v1, v2) == 0;
 }
 
 // проверяет не равенство двух decimal
 // вернет 1 - если v1 <> v2, иначе 0
 int s21_is_not_equal(s21_decimal v1, s21_decimal v2) {
-  return s21_is_equal(v1, v2) == 0 ? 1 : 0;
+  return !s21_is_equal(v1, v2);
 }
-
-// 1000/10^2 + 1000/10^3 = (1000 * 10^1) / (10^2 * 10^1) + 1000/10^3 =
-// 10000/10^3 + 1000/10^3
-// 1000 * 10 = 1000 * 8 + 1000 * 2 = 1000 * 2^3 + 1000 *
-// 2^1 = 1000 << 3 + 1000 << 1 = 1000 -> decimal -> shift_left(3) + 1000 ->
-// decimal -> shift_left(1) = 10000/10^3 10000/10^3 + 1000/10^3 -> 11000/10^3
-
-// 1000 / 10 = 1000 / (8 + 2) = 1000 * 2^3 + 1000 *
 
 // сложение двух s21_decimal
 int s21_add(s21_decimal value_1, s21_decimal value_2, s21_decimal *result) {
@@ -368,11 +409,6 @@ int s21_add(s21_decimal value_1, s21_decimal value_2, s21_decimal *result) {
   if (big_get_sign(v1) == 0 && big_get_sign(v2) == 0) {
     bitwise_addition(v1, v2, &res);
     big_set_sign(&res, 0);
-
-    if (big_get_bit(res, 96)) {
-    }
-
-    printf("%d\n", v1s);
   } else if (big_get_sign(v1) == 1 && big_get_sign(v2) == 1) {
     bitwise_addition(v1, v2, &res);
     big_set_sign(&res, 1);
@@ -389,13 +425,11 @@ int s21_add(s21_decimal value_1, s21_decimal value_2, s21_decimal *result) {
   }
   big_set_scale(&res, big_get_scale(v1));
 
-  print_big_decimal(res);
-  printf("\n");
-
   // копирование результата
-  *result = to_decimal(res);
+  int exit_code = OK;
+  exit_code = fit_to_decimal(res, result);
 
-  return OK;
+  return exit_code;
 }
 
 // вычитание двух s21_decimal
@@ -437,9 +471,10 @@ int s21_sub(s21_decimal value_1, s21_decimal value_2, s21_decimal *result) {
   big_set_scale(&res, big_get_scale(v1));
 
   // копирование результата
-  *result = to_decimal(res);
+  int exit_code = OK;
+  exit_code = fit_to_decimal(res, result);
 
-  return OK;
+  return exit_code;
 }
 
 int s21_mul(s21_decimal value_1, s21_decimal value_2, s21_decimal *result) {
@@ -451,10 +486,6 @@ int s21_mul(s21_decimal value_1, s21_decimal value_2, s21_decimal *result) {
   s21_big_decimal v1 = tobig_decimal(value_1);
   s21_big_decimal v2 = tobig_decimal(value_2);
 
-  // значащие байты
-  int size = (sizeof(s21_big_decimal) - sizeof(unsigned));
-  // значащие биты
-  int sizeb = size * 8;
   // поиск ненулевого бита v2
   int not_null_i = not_null(v2);
   // перебор разрядов v2 начиная со старшего не нулевого
@@ -468,10 +499,12 @@ int s21_mul(s21_decimal value_1, s21_decimal value_2, s21_decimal *result) {
   big_set_sign(&res, big_get_sign(v1) ^ big_get_sign(v2));
   // порядок результата = порядок v1 + порядок v2
   big_set_scale(&res, big_get_scale(v1) + big_get_scale(v2));
-  // копирование результата
-  *result = to_decimal(res);
 
-  return OK;
+  // копирование результата
+  int exit_code = OK;
+  exit_code = fit_to_decimal(res, result);
+
+  return exit_code;
 }
 
 int s21_div(s21_decimal value_1, s21_decimal value_2, s21_decimal *result) {
@@ -483,13 +516,14 @@ int s21_div(s21_decimal value_1, s21_decimal value_2, s21_decimal *result) {
   s21_big_decimal v1 = tobig_decimal(value_1);
   s21_big_decimal v2 = tobig_decimal(value_2);
 
-  // нормализация, scale 1 >= scale 2
-  if (big_get_scale(v1) < big_get_scale(v2)) {
-    enlarge_scale(&v1, big_get_scale(v2));
-  }
+  int sign1 = big_get_sign(v1);
+  int sign2 = big_get_sign(v2);
+  big_set_sign(&v1, 0);
+  big_set_sign(&v2, 0);
 
-  // делим если делимое больше делителя и делитель <> 0
   if (!big_is_zero(v2)) {
+    enlarge_scale(&v1, 29 + big_get_scale(v2));
+
     // первый ненулевой бит v1
     int nnb1 = not_null(v1);
     // первый ненулевой бит v2
@@ -512,20 +546,24 @@ int s21_div(s21_decimal value_1, s21_decimal value_2, s21_decimal *result) {
     }
   } else {
     // ошибка - на ноль делить нельзя
-    return CALC_ERROR;
+    return DIV_BY_ZERRO_ERROR;
   }
 
   // знак (-) если один множитель со знаком (-) а другой нет
-  big_set_sign(&res, big_get_sign(v1) ^ big_get_sign(v2));
+  big_set_sign(&res, sign1 ^ sign2);
   // порядок результата = порядок v1 - порядок v2
   big_set_scale(&res, big_get_scale(v1) - big_get_scale(v2));
-  // копирование результата
-  *result = to_decimal(res);
 
-  return OK;
+  // копирование результата
+  int exit_code = OK;
+  exit_code = fit_to_decimal(res, result);
+
+  return exit_code;
 }
 
 int s21_from_int_to_decimal(int src, s21_decimal *dst) {
+  null_decimal(dst);
+
   set_scale(dst, 0);
   set_sign(dst, src >= 0 ? 0 : 1);
   dst->bits[0] = src >= 0 ? src : -src;
@@ -538,8 +576,9 @@ int s21_from_float_to_decimal(float src, s21_decimal *dst) {
   sprintf(str, "%.6e", src);
 
   int i = 0;
-  for (; i < strlen(str); i++) {
-    if (str[i] == 'e') break;
+  for (; i < (int)strlen(str); i++) {
+    if (str[i] == 'e')
+      break;
     if (str[i] >= '0' && str[i] <= '9') {
       value *= 10;
       value += str[i] - '0';
@@ -548,14 +587,16 @@ int s21_from_float_to_decimal(float src, s21_decimal *dst) {
 
   int scale = 0;
   int scale_sign = 0;
-  for (; i < strlen(str); i++) {
-    if (str[i] == '-') scale_sign = 1;
+  for (; i < (int)strlen(str); i++) {
+    if (str[i] == '-')
+      scale_sign = 1;
     if (str[i] >= '0' && str[i] <= '9') {
       scale *= 10;
       scale += str[i] - '0';
     }
   }
-  if (scale_sign) scale = -scale;
+  if (scale_sign)
+    scale = -scale;
   scale -= 6;
 
   s21_big_decimal tmp;
@@ -575,64 +616,173 @@ int s21_from_float_to_decimal(float src, s21_decimal *dst) {
   }
 
   // копирование результата
-  *dst = to_decimal(tmp);
+  int exit_code = OK;
+  exit_code = fit_to_decimal(tmp, dst);
 
-  return OK;
+  if (exit_code) {
+    exit_code = CONV_ERROR;
+  } else {
+    if (src != 0.0 && dst->bits[0] == 0 && dst->bits[1] == 0 &&
+        dst->bits[2] == 0) {
+      exit_code = CONV_ERROR;
+    } else if (get_scale(*dst) == 28 && src != 0.0 && dst->bits[0] == 1 &&
+               dst->bits[1] == 0 && dst->bits[2] == 0) {
+      exit_code = CONV_ERROR;
+    }
+  }
+  return exit_code;
 }
 
 int s21_from_decimal_to_int(s21_decimal src, int *dst) {
-  s21_decimal ten;
-  null_decimal(&ten);
-  ten.bits[0] = 10;
+  s21_big_decimal tmp = tobig_decimal(src);
 
-  s21_decimal tmp = src;
-  for (int i = 0; i < get_scale(src); i++) {
-    s21_div(tmp, ten, &tmp);
-  }
+  int sign = big_get_sign(tmp);
 
-  set_bit(&tmp, 31, 0);
+  div_10(&tmp, get_scale(src));
+
   int value = tmp.bits[0];
-  value = get_sign(tmp) ? -value : value;
+  value = big_get_sign(tmp) ? -value : value;
   *dst = value;
 
-  return OK;
+  int return_status = OK;
+  if ((sign && value > 0) || (!sign && value < 0)) {
+    return_status = CONV_ERROR;
+  }
+  return return_status;
 }
 
-int s21_from_decimal_to_float(s21_decimal src, float *dst) { return 0; }
+int s21_from_decimal_to_float(s21_decimal src, float *dst) {
+  char str[50], rstr[50];
+  char newstr[100];
+  s21_big_decimal value = tobig_decimal(src);
+  int scale = big_get_scale(value);
+  int sign = big_get_sign(value);
+
+  int i = 0;
+  int dot = 0;
+  int reminder = rem_10(value, &value);
+  str[i] = '0' + reminder;
+  dot++;
+  i++;
+  while (value.bits[0] != 0 || value.bits[1] != 0 || value.bits[2] != 0) {
+    if (dot == scale) {
+      str[i] = '.';
+      i++;
+    }
+    reminder = rem_10(value, &value);
+    str[i] = '0' + reminder;
+    dot++;
+    i++;
+  }
+  str[i] = '\0';
+
+  int len = strlen(str);
+  rstr[len] = '\0';
+  for (int i = 0; i < len; i++) {
+    rstr[i] = str[len - i - 1];
+  }
+  sprintf(newstr, "%s%se%d", sign == 1 ? "-" : "", rstr,
+          dot >= scale ? 0 : -scale);
+
+  float f;
+  sscanf(newstr, "%e", &f);
+  *dst = f;
+
+  int return_status = OK;
+  return return_status;
+}
+
+void shift_left_small(s21_decimal *value, int shift) {
+  // Shift mantissa (bits[0..2]) left by `shift` bits, preserving sign/scale
+  // in bits[3]
+  for (int s = 0; s < shift; s++) {
+    uint32_t carry0 = (value->bits[0] >> 31) & 1u;
+    uint32_t carry1 = (value->bits[1] >> 31) & 1u;
+    value->bits[0] <<= 1;
+    value->bits[1] = (value->bits[1] << 1) | carry0;
+    value->bits[2] = (value->bits[2] << 1) | carry1;
+    // bits[3] contains sign and scale and must not be modified here
+  }
+}
 
 int s21_floor(s21_decimal value, s21_decimal *result) {
-  int scale = get_scale(value);
+  // int scale = get_scale(value);
   int sign = get_sign(value);
-  set_sign(&value, 0);
-  s21_truncate(value, result);
-  if (sign == 1 && s21_is_not_equal(value, *result)) {
-    s21_decimal neg_decimal;
-    s21_from_int_to_decimal(-1, &neg_decimal);
-    s21_add(*result, neg_decimal, result);
+  // set_sign(&value, 0);
+  // s21_truncate(value, result);
+  // if (sign == 1 && s21_is_not_equal(value, *result)) {
+  //   set_sign(result, 1);
+  //   s21_decimal neg_decimal;
+  //   s21_from_int_to_decimal(-1, &neg_decimal);
+  //   s21_add(*result, neg_decimal, result);
+  s21_decimal before_dot;
+  s21_truncate(value, &before_dot);
+
+  s21_decimal after_dot;
+  s21_sub(value, before_dot, &after_dot);
+  if (sign == 1) {
+    if (!is_zero(after_dot)) {
+      s21_decimal neg_decimal;
+      s21_from_int_to_decimal(-1, &neg_decimal);
+      s21_add(before_dot, neg_decimal, result);
+    }
+  } else {
+    *result = before_dot;
   }
   return 0;
 }
 
 int s21_round(s21_decimal value, s21_decimal *result) {
   s21_decimal half;
-  s21_from_int_to_decimal(0.5, &half);
+  int sign = get_sign(value);
+  // int scale = get_scale(value);
+  create_decimal(&half, sign, 1, 5, 0, 0);
   s21_add(value, half, result);
   s21_truncate(*result, result);
   return 0;
 }
 
 int s21_truncate(s21_decimal value, s21_decimal *result) {
+  if (result == NULL) {
+    return JUST_ERROR; // Handle NULL result pointer
+  }
+
+  *result = value; // Copy entire decimal (including sign, scale, mantissa)
   int scale = get_scale(value);
-  int div = 10 ^ scale;
-  s21_decimal div2;
-  s21_from_int_to_decimal(div, &div2);
-  s21_div(value, div2, result);
-  return 0;
+  // If scale is zero, no truncation needed
+  if (scale == 0) {
+    return OK;
+  }
+
+  // Early exit if mantissa is zero
+  if (value.bits[0] == 0 && value.bits[1] == 0 && value.bits[2] == 0) {
+    set_scale(result, 0);
+    return OK;
+  }
+
+  // Divide by 10 for each unit of scale
+  for (int i = 0; i < scale; i++) {
+    uint64_t remainder = 0;
+    // Process each 32-bit chunk (MSW first: bits[2] -> bits[0])
+    for (int j = 2; j >= 0; j--) {
+      uint64_t temp = ((uint64_t)remainder << 32) | (uint64_t)result->bits[j];
+      result->bits[j] = (uint32_t)(temp / 10);
+      remainder = temp % 10;
+    }
+    // Early stop if mantissa becomes zero
+    if (result->bits[0] == 0 && result->bits[1] == 0 && result->bits[2] == 0) {
+      break;
+    }
+  }
+
+  set_scale(result, 0); // Set as integer
+  return OK;
 }
 
 int s21_negate(s21_decimal value, s21_decimal *result) {
-  s21_decimal div2;
-  s21_from_int_to_decimal(-1, &div2);
-  s21_mul(value, div2, result);
+  int sign = get_sign(value);
+  sign = (sign) ? 0 : 1;
+  *result = value;
+  set_sign(result, sign);
   return 0;
 }

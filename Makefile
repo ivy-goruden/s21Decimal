@@ -1,11 +1,10 @@
 CC = gcc
-CFLAGS = -Werror -std=c11
-#CFLAGS = -Wall - Wextra - Werror - std = c11
+CFLAGS = -Wall -Wextra -Werror -std=c11
 
 BUILD = ../build/
 SRC_DIR = ./
 SRC = $(wildcard $(SRC_DIR)*.c)
-TEST_SRC = $(wildcard tests/enolagal/*.c)
+TEST_SRC = $(wildcard tests/*.c)
 HEADERS = $(wildcard $(SRC_DIR)*.h)
 FUNC_OBJECTS = $(SRC:.c=.o)
 INCLUDES = -I $(SRC_DIR)
@@ -29,6 +28,7 @@ test: clean build
 	./$(TARGET)
 
 sanitize: clean s21_decimal.a
+	mkdir -p $(BUILD)
 	$(CC) $(CFLAGS) $(SANITIZE) $(TEST_SRC) -o $(BUILD)/sanitize $(TEST_LIBS) -L. -l:s21_decimal.a
 	$(BUILD)/sanitize
 
@@ -38,7 +38,9 @@ valgrind: clean build
 clean:
 	rm -f $(TARGET)
 	rm -f ../src/**/*.[ao] ./*.[ao]
-	rm -fr ../build/*
+	-chmod -R u+rwX $(BUILD) 2>/dev/null || true
+	-find $(BUILD) -type f -exec chmod u+rw {} + 2>/dev/null || true
+	-rm -rf $(BUILD)
 
 cf:
 	clang-format -i ../src/**/*.[ch]
@@ -48,6 +50,8 @@ cf-check:
 	clang-format -n ../src/**/*.[ch]
 	clang-format -n ../src/*.[ch]
 
+# Coverage report (WSL/Unix)
+
 gcov_report:
 	mkdir -p $(BUILD)
 	$(CC) $(GCOV_FLAGS) $(SRC) $(TEST_SRC) -o $(BUILD)/gcov_report $(TEST_LIBS)
@@ -55,3 +59,8 @@ gcov_report:
 	lcov -c -d $(BUILD) -o $(BUILD)/coverage.info
 	genhtml -o $(BUILD)/report $(BUILD)/coverage.info
 	google-chrome $(BUILD)/report/index.html
+
+fixperms:
+	-@chown -R $(shell id -u):$(shell id -g) $(BUILD) 2>/dev/null || true
+	-@chmod -R u+rwX $(BUILD) 2>/dev/null || true
+	@echo "Permissions adjusted for $(BUILD) (where supported)."

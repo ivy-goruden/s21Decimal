@@ -12,6 +12,12 @@ typedef struct {
 #define OK 0
 #define CONV_ERROR 1
 #define CALC_ERROR 1
+#define TOO_BIG_ERROR 1
+#define TOO_SMALL_ERROR 2
+#define DIV_BY_ZERRO_ERROR 3
+#define MIN_SCALE 0
+#define MAX_SCALE 28
+#define JUST_ERROR 1
 
 s21_big_decimal tobig_decimal(s21_decimal num);
 s21_decimal to_decimal(s21_big_decimal big);
@@ -39,7 +45,11 @@ void shift_left(s21_big_decimal *num);
 void shift_left_num(s21_big_decimal *num, int shift_value);
 
 void mul_10(s21_big_decimal *num);
+int rem_10(s21_big_decimal num, s21_big_decimal *result);
+void div_10(s21_big_decimal *num, int pow);
 void enlarge_scale(s21_big_decimal *num, unsigned char scale);
+int cmp_mantis(s21_big_decimal v1, s21_big_decimal v2);
+int not_null(s21_big_decimal v);
 void bitwise_addition(s21_big_decimal v1, s21_big_decimal v2,
                       s21_big_decimal *result);
 void bitwise_substruction(s21_big_decimal v1, s21_big_decimal v2,

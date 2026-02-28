@@ -1,0 +1,22 @@
+#include "../s21_decimal.h"
+#include "../utilities.h"
+
+int main_zero(void);
+int main_s21_add(void);
+int main_s21_sub(void);
+int main_s21_mul(void);
+int main_s21_div(void);
+int main_s21_decimal_to_int(void);
+int main_s21_decimal_to_float(void);
+int main_s21_float_to_decimal(void);
+//******************************************************* */
+int main_s21_equal(void);
+int main_s21_greater_or_equal(void);
+int main_s21_greater(void);
+int main_s21_less(void);
+int main_s21_less_or_equal(void);
+int main_s21_not_equal(void);
+int main_s21_floor(void);
+int main_s21_round(void);
+int main_s21_truncate(void);
+int main_s21_negate(void);
